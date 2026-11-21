@@ -30,10 +30,11 @@ Blocks `git commit` with an issue reference (e.g. `ISSUE-42`) when:
 #
 #  Claude Code PreToolUse hook (Bash)
 #  Input: JSON via stdin: {"tool_input": {"command": "..."}}
-#  Exit 1 → tool call blocked | Exit 0 → allowed
+#  Exit 2 → tool call blocked | Exit 0 → allowed
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+exec 1>&2
 
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 
@@ -75,7 +76,7 @@ if [ ! -f "$SPEC_FILE" ]; then
   echo "  2. Create + fill specs/${ISSUE}.md"
   echo "  3. git add specs/${ISSUE}.md && git commit -m 'docs: specs/${ISSUE}.md'"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # ── Check 2: Agent-Pattern section present? ────────────────────────────────
@@ -93,7 +94,7 @@ if ! grep -q "## Agent-Pattern" "$SPEC_FILE"; then
   echo "  2. Insert the ## Agent-Pattern section from specs/TEMPLATE.md"
   echo "  3. Fill chosen pattern + rationale"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # ── Check 3: chosen pattern not empty/TBD/placeholder? ─────────────────────
@@ -107,7 +108,7 @@ if [ -z "$PATTERN" ] || [ "$PATTERN" = "TBD" ] || echo "$PATTERN" | grep -q "\["
   echo "  'Chosen pattern:' is empty, TBD, or still a placeholder."
   echo "  Allowed values: Solo | Subagent | Agent-Team | Parallel-Subagents"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # ── Check 4: Agent-Team → team composition present? ────────────────────────
@@ -123,7 +124,7 @@ if echo "$PATTERN" | grep -qi "Agent-Team"; then
     echo "  Example: Lead (Sonnet) + Explore (Haiku) + Plan (Sonnet)"
     echo "  Fill in: **Team composition:** in specs/${ISSUE}.md"
     echo ""
-    exit 1
+    exit 2
   fi
 fi
 
@@ -166,7 +167,7 @@ Layer-0 gate: a Claude Code **PreToolUse hook** with matcher `Edit|Write|MultiEd
 
 **Behavior:**
 - Default: **warning** (low false positive, no alarm fatigue) — `warn` patterns report to stderr but do not block.
-- `BODYGUARD_STRICT=1`: **hard block** — all `warn` patterns are escalated to `block`, exit 1 prevents the write.
+- `BODYGUARD_STRICT=1`: **hard block** — all `warn` patterns are escalated to `block`, exit 2 prevents the write.
 - `block` patterns (e.g. AWS key, private-key block) always block.
 
 Deliberately lightweight: a small, curated pattern set per edit — NOT a full Semgrep run (depth stays at layers 2/3). Pattern schema (flat YAML subset, read by a mini parser in the hook — no PyYAML): `name` · `pattern` (Python regex) · `language` · `source` (CWE/OWASP/gitleaks/Semgrep — mandatory, audit evidence) · `action` (`block|warn`).
@@ -185,6 +186,7 @@ Blocks `git commit` when `lib/config.js` is staged with an increased VERSION but
 # Blocks git commit when config.js VERSION is raised but docs are outdated
 # Activation: in .claude/settings.json as a PreToolUse hook on Bash calls
 
+exec 1>&2
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 CONFIG_FILE="${PROJECT_ROOT}/lib/config.js"
 
@@ -225,7 +227,7 @@ if [ $MISMATCH -eq 1 ]; then
   echo ""
   echo "⛔ DOC-VERSION-SYNC: update documentation files to the new version!"
   echo "   Bypass: git commit --no-verify (only for deliberate bypass, with justification in commit)"
-  exit 1
+  exit 2
 fi
 
 echo "✓ All docs on version ${CURRENT_VERSION}"
@@ -295,6 +297,7 @@ If Block C (doc architecture) activated hub auto-linking, the bootstrap skill in
 
 set -euo pipefail
 
+exec 1>&2
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 HUB="${PROJECT_ROOT}/ARCHITECTURE_DESIGN.md"
 
@@ -345,7 +348,7 @@ if [ -n "$ORPHANS" ]; then
   echo ""
   echo "  Rule: ARCHITECTURE_DESIGN.md is the hub — all new docs must be linked there."
   echo "  Add them to §9 References, then re-commit."
-  exit 1
+  exit 2
 fi
 
 exit 0

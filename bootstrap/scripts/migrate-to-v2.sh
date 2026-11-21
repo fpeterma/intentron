@@ -268,7 +268,7 @@ fi
 
 # --- Semgrep-Gate (BOO-4, Manifest-Reader) ---
 if [[ -f ".semgrep.yml" ]]; then
-    PACKS=$(grep -E '^[[:space:]]*-[[:space:]]+p/' .semgrep.yml | sed -E 's/^[[:space:]]*-[[:space:]]+//' || true)
+    PACKS=$(grep -E '^[[:space:]]*-[[:space:]]+p/' .semgrep.yml | sed -E 's/^[[:space:]]*-[[:space:]]+//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//' || true)
     if [[ -n "$PACKS" ]]; then
         ARGS=""
         for pack in $PACKS; do
@@ -331,7 +331,7 @@ jobs:
           mkdir -p .ci-reports
           ARGS=""
           while IFS= read -r line; do
-              pack=$(echo "$line" | sed -E 's/^[[:space:]]*-[[:space:]]+//')
+              pack=$(echo "$line" | sed -E 's/^[[:space:]]*-[[:space:]]+//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//')
               ARGS="$ARGS --config $pack"
           done < <(grep -E '^[[:space:]]*-[[:space:]]+p/' .semgrep.yml)
           if [[ -z "$ARGS" ]]; then
@@ -3424,7 +3424,7 @@ migrate_boo_86() {
 #
 #  Claude Code PreToolUse Hook (Bash) — Matcher: Edit|Write
 #  Input: JSON via stdin: {"tool_input": {"file_path": "...", "content"/"new_string": "..."}}
-#  Exit 1 → Tool-Call blockiert | Exit 0 → erlaubt (Default: Warnung)
+#  Exit 2 → Tool-Call blockiert | Exit 0 → erlaubt (Default: Warnung)
 #  BODYGUARD_STRICT=1 → warn-Muster werden zu block (opt-in Hard-Block)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -3497,7 +3497,7 @@ if warns:
 if blocks:
     sys.stderr.write("\n[BODYGUARD] BLOCKIERT — sicherheitskritische Muster:\n" + "\n".join(blocks) +
                      "\n  Bitte entfernen/ersetzen: Secret in env/Secret-Manager, parametrisierte Query, sichere API/TLS.\n")
-    sys.exit(1)
+    sys.exit(2)
 sys.exit(0)
 PYEOF
 )" "$PATTERN_DIR" "$OVERLAY" "$STRICT"

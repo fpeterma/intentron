@@ -30,10 +30,11 @@ Blockiert `git commit` mit Issue-Referenz (z.B. `ISSUE-42`) wenn:
 #
 #  Claude Code PreToolUse Hook (Bash)
 #  Input: JSON via stdin: {"tool_input": {"command": "..."}}
-#  Exit 1 → Tool-Call blockiert | Exit 0 → erlaubt
+#  Exit 2 → Tool-Call blockiert | Exit 0 → erlaubt
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+exec 1>&2
 
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 
@@ -75,7 +76,7 @@ if [ ! -f "$SPEC_FILE" ]; then
   echo "  2. specs/${ISSUE}.md erstellen + befüllen"
   echo "  3. git add specs/${ISSUE}.md && git commit -m 'docs: specs/${ISSUE}.md'"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # ── Check 2: Agent-Pattern Sektion vorhanden? ────────────────────────────────
@@ -93,7 +94,7 @@ if ! grep -q "## Agent-Pattern" "$SPEC_FILE"; then
   echo "  2. ## Agent-Pattern Sektion aus specs/TEMPLATE.md einfügen"
   echo "  3. Gewähltes Pattern + Begründung ausfüllen"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # ── Check 3: Gewähltes Pattern nicht leer/TBD/Platzhalter? ───────────────────
@@ -107,7 +108,7 @@ if [ -z "$PATTERN" ] || [ "$PATTERN" = "TBD" ] || echo "$PATTERN" | grep -q "\["
   echo "  'Gewähltes Pattern:' ist leer, TBD oder noch Platzhalter."
   echo "  Erlaubte Werte: Solo | Subagent | Agent-Team | Parallel-Subagents"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # ── Check 4: Agent-Team → Team-Komposition vorhanden? ────────────────────────
@@ -123,7 +124,7 @@ if echo "$PATTERN" | grep -qi "Agent-Team"; then
     echo "  Beispiel: Lead (Sonnet) + Explore (Haiku) + Plan (Sonnet)"
     echo "  Eintragen: **Team-Komposition:** in specs/${ISSUE}.md"
     echo ""
-    exit 1
+    exit 2
   fi
 fi
 
@@ -166,7 +167,7 @@ Layer-0-Gate: Ein Claude-Code-**PreToolUse-Hook** mit Matcher `Edit|Write|MultiE
 
 **Verhalten:**
 - Default: **Warnung** (low-false-positive, keine Alarm-Muedigkeit) — `warn`-Muster melden auf stderr, blockieren aber nicht.
-- `BODYGUARD_STRICT=1`: **Hard-Block** — alle `warn`-Muster werden zu `block` hochgestuft, Exit 1 verhindert den Schreibvorgang.
+- `BODYGUARD_STRICT=1`: **Hard-Block** — alle `warn`-Muster werden zu `block` hochgestuft, Exit 2 verhindert den Schreibvorgang.
 - `block`-Muster (z.B. AWS-Key, Private-Key-Block) blockieren immer.
 
 Bewusst leichtgewichtig: eine kleine, kuratierte Muster-Menge pro Edit — KEIN voller Semgrep-Lauf (Tiefe bleibt bei Layer 2/3). Muster-Schema (flacher YAML-Subset, vom Mini-Parser im Hook gelesen — kein PyYAML): `name` · `pattern` (Python-Regex) · `sprache` · `quelle` (CWE/OWASP/gitleaks/Semgrep — Pflicht, Audit-Beleg) · `action` (`block|warn`).
@@ -185,6 +186,7 @@ Blockiert `git commit` wenn `lib/config.js` mit erhöhter VERSION gestaged ist, 
 # Blockiert git commit wenn config.js VERSION erhoeht aber Doku veraltet
 # Aktivierung: in .claude/settings.json als PreToolUse-Hook auf Bash-Calls
 
+exec 1>&2
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 CONFIG_FILE="${PROJECT_ROOT}/lib/config.js"
 
@@ -225,7 +227,7 @@ if [ $MISMATCH -eq 1 ]; then
   echo ""
   echo "⛔ DOC-VERSION-SYNC: Dokumentationsdateien auf alte Version aktualisieren!"
   echo "   Bypass: git commit --no-verify (nur bei bewusstem Bypass, mit Begruendung im Commit)"
-  exit 1
+  exit 2
 fi
 
 echo "✓ Alle Docs auf Version ${CURRENT_VERSION}"
@@ -295,6 +297,7 @@ Wenn in Block C (Doku-Architektur) die Hub-Auto-Verlinkung aktiviert wurde, inst
 
 set -euo pipefail
 
+exec 1>&2
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 HUB="${PROJECT_ROOT}/ARCHITECTURE_DESIGN.md"
 
@@ -345,7 +348,7 @@ if [ -n "$ORPHANS" ]; then
   echo ""
   echo "  Regel: ARCHITECTURE_DESIGN.md ist Hub — alle neuen Docs muessen dort verlinkt sein."
   echo "  Bitte §9 Referenzen ergaenzen, dann erneut committen."
-  exit 1
+  exit 2
 fi
 
 exit 0
