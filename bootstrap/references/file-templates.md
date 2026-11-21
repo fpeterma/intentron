@@ -590,10 +590,11 @@ estimation_basis: |
 #
 #  Claude Code PreToolUse Hook (Bash)
 #  Input: JSON via stdin: {"tool_input": {"command": "..."}}
-#  Exit 1 → Tool-Call blockiert | Exit 0 → erlaubt
+#  Exit 2 → Tool-Call blockiert | Exit 0 → erlaubt
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+exec 1>&2
 
 WORKSPACE="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 ISSUE_PREFIX="{{ISSUE_PREFIX}}"  # z.B. "PROJ-"
@@ -636,7 +637,7 @@ if [ ! -f "$SPEC_FILE" ]; then
   echo "  2. specs/${ISSUE}.md erstellen + befüllen"
   echo "  3. git add specs/${ISSUE}.md && git commit -m 'docs: specs/${ISSUE}.md'"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # Agent-Pattern prüfen — Sektion vorhanden?
@@ -653,7 +654,7 @@ if ! grep -q "## Agent-Pattern" "$SPEC_FILE"; then
   echo "  2. ## Agent-Pattern Sektion aus specs/TEMPLATE.md einfügen"
   echo "  3. Gewähltes Pattern ausfüllen"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # Agent-Pattern prüfen — nicht leer/TBD
@@ -666,7 +667,7 @@ if [ -z "$PATTERN" ] || [ "$PATTERN" = "TBD" ] || echo "$PATTERN" | grep -q "\["
   echo ""
   echo "  Erlaubte Werte: Solo | Subagent | Agent-Team | Parallel-Subagents"
   echo ""
-  exit 1
+  exit 2
 fi
 
 # Agent-Team: Team-Komposition prüfen
@@ -681,7 +682,7 @@ if echo "$PATTERN" | grep -qi "Agent-Team"; then
     echo "  Pattern 'Agent-Team' gewählt aber Team-Komposition ist leer."
     echo "  Beispiel: Lead (Sonnet) + Explore (Haiku) + Plan (Sonnet)"
     echo ""
-    exit 1
+    exit 2
   fi
 fi
 
@@ -700,7 +701,7 @@ if ! grep -q "## Rollout" "$SPEC_FILE"; then
   echo "  3. Feature-Flag-Name und Rollout-Stufen ausfuellen"
   echo "     (Fuer reine Doku-Stories: '**Feature-Flag:** n/a' genügt)"
   echo ""
-  exit 1
+  exit 2
 fi
 
 exit 0
@@ -723,6 +724,7 @@ exit 0
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+exec 1>&2
 
 WORKSPACE="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
@@ -803,7 +805,7 @@ done
 echo ""
 echo "  Escape-Hatch: git commit --no-verify"
 echo ""
-exit 1
+exit 2
 ```
 
 ---
@@ -1284,7 +1286,7 @@ fi
 # --- Semgrep-Gate (BOO-4, Manifest-Reader-Logik) ---
 if [[ -f ".semgrep.yml" ]]; then
     # Manifest-Reader: extrahiert aktive Pack-Namen (Layer 1 Pflicht + Layer 2/3 wenn nicht auskommentiert)
-    PACKS=$(grep -E '^[[:space:]]*-[[:space:]]+p/' .semgrep.yml | sed -E 's/^[[:space:]]*-[[:space:]]+//' || true)
+    PACKS=$(grep -E '^[[:space:]]*-[[:space:]]+p/' .semgrep.yml | sed -E 's/^[[:space:]]*-[[:space:]]+//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//' || true)
     if [[ -n "$PACKS" ]]; then
         ARGS=""
         for pack in $PACKS; do
@@ -1379,7 +1381,7 @@ jobs:
           mkdir -p .ci-reports
           ARGS=""
           while IFS= read -r line; do
-              pack=$(echo "$line" | sed -E 's/^[[:space:]]*-[[:space:]]+//')
+              pack=$(echo "$line" | sed -E 's/^[[:space:]]*-[[:space:]]+//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//')
               ARGS="$ARGS --config $pack"
           done < <(grep -E '^[[:space:]]*-[[:space:]]+p/' .semgrep.yml)
           if [[ -z "$ARGS" ]]; then
@@ -2090,7 +2092,7 @@ Muster-Schema (flacher YAML-Subset, vom Mini-Parser im Hook gelesen — kein PyY
 #
 #  Claude Code PreToolUse Hook (Bash) — Matcher: Edit|Write
 #  Input: JSON via stdin: {"tool_input": {"file_path": "...", "content"/"new_string": "..."}}
-#  Exit 1 → Tool-Call blockiert | Exit 0 → erlaubt (Default: Warnung)
+#  Exit 2 → Tool-Call blockiert | Exit 0 → erlaubt (Default: Warnung)
 #  BODYGUARD_STRICT=1 → warn-Muster werden zu block (opt-in Hard-Block)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -2164,7 +2166,7 @@ if warns:
 if blocks:
     sys.stderr.write("\n[BODYGUARD] BLOCKIERT — sicherheitskritische Muster:\n" + "\n".join(blocks) +
                      "\n  Bitte entfernen/ersetzen: Secret in env/Secret-Manager, parametrisierte Query, sichere API/TLS.\n")
-    sys.exit(1)
+    sys.exit(2)
 sys.exit(0)
 PYEOF
 )" "$PATTERN_DIR" "$OVERLAY" "$STRICT"
